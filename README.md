@@ -3,7 +3,7 @@
 > [!WARNING]
 > テストが不十分であり、間違いがある可能性があります。
 
-平衡二分探索木である Python の [tatyam-prime/SortedSet](https://github.com/tatyam-prime/SortedSet) の Go による再実装です。
+平衡√N分探索木である Python の [tatyam-prime/SortedSet](https://github.com/tatyam-prime/SortedSet) の Go による再実装です。
 
 ```sh
 go get github.com/ikura-hamu/go-sorted_set
