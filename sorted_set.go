@@ -15,8 +15,8 @@ const (
 )
 
 type SortedSet[T cmp.Ordered] struct {
-	a    [][]T
-	size int
+	buckets [][]T
+	size    int
 }
 
 func New[T cmp.Ordered](a []T) *SortedSet[T] {
@@ -31,10 +31,10 @@ func New[T cmp.Ordered](a []T) *SortedSet[T] {
 
 	numBucket := int(math.Ceil(math.Sqrt(float64(n) / float64(bucketRatio))))
 
-	s.a = make([][]T, numBucket)
+	s.buckets = make([][]T, numBucket)
 	for i := 0; i < numBucket; i++ {
-		s.a[i] = make([]T, 0, n/numBucket)
-		s.a[i] = append(s.a[i], a[i*n/numBucket:(i+1)*n/numBucket]...)
+		s.buckets[i] = make([]T, 0, n/numBucket)
+		s.buckets[i] = append(s.buckets[i], a[i*n/numBucket:(i+1)*n/numBucket]...)
 	}
 
 	return s
@@ -43,7 +43,7 @@ func New[T cmp.Ordered](a []T) *SortedSet[T] {
 func (s *SortedSet[T]) All() iter.Seq2[int, T] {
 	return func(yield func(int, T) bool) {
 		idx := 0
-		for _, bucket := range s.a {
+		for _, bucket := range s.buckets {
 			for _, v := range bucket {
 				if !yield(idx, v) {
 					return
@@ -56,7 +56,7 @@ func (s *SortedSet[T]) All() iter.Seq2[int, T] {
 
 func (s *SortedSet[T]) Values() iter.Seq[T] {
 	return func(yield func(T) bool) {
-		for _, bucket := range s.a {
+		for _, bucket := range s.buckets {
 			for _, v := range bucket {
 				if !yield(v) {
 					return
@@ -70,8 +70,8 @@ func (s *SortedSet[T]) Backward() iter.Seq2[int, T] {
 	return func(yield func(int, T) bool) {
 		idx := s.size - 1
 		for i := range s.size {
-			for j := range len(s.a[s.size-i-1]) {
-				if !yield(idx, s.a[s.size-i-1][len(s.a[s.size-i-1])-j-1]) {
+			for j := range len(s.buckets[s.size-i-1]) {
+				if !yield(idx, s.buckets[s.size-i-1][len(s.buckets[s.size-i-1])-j-1]) {
 					return
 				}
 				idx--
@@ -88,8 +88,8 @@ func (s *SortedSet[T]) Equals(other *SortedSet[T]) bool {
 	if s.size != other.size {
 		return false
 	}
-	for i := range s.a {
-		if !slices.Equal(s.a[i], other.a[i]) {
+	for i := range s.buckets {
+		if !slices.Equal(s.buckets[i], other.buckets[i]) {
 			return false
 		}
 	}
@@ -100,9 +100,9 @@ func (s *SortedSet[T]) String() string {
 	sb := &strings.Builder{}
 	_, _ = sb.WriteString("SortedSet{")
 
-	for i := range s.a {
-		for j := range s.a[i] {
-			_, _ = sb.WriteString(fmt.Sprintf("%v, ", s.a[i][j]))
+	for i := range s.buckets {
+		for j := range s.buckets[i] {
+			_, _ = sb.WriteString(fmt.Sprintf("%v, ", s.buckets[i][j]))
 		}
 	}
 
@@ -111,15 +111,18 @@ func (s *SortedSet[T]) String() string {
 	return sb.String()
 }
 
-func (s *SortedSet[T]) position(x T) ([]T, int, int) {
+// return the bucket, index of the bucket and position in which x should be.
+func (s *SortedSet[T]) position(x T) (*[]T, int, int) {
 	var bucket int
-	var a []T
-	for bucket, a = range s.a {
-		if x <= a[len(a)-1] {
+	var a *[]T
+	for bucket = range s.buckets {
+		a = &s.buckets[bucket]
+		fmt.Println("buckets", s.buckets)
+		if x <= (*a)[len(*a)-1] {
 			break
 		}
 	}
-	i, _ := slices.BinarySearch(a, x)
+	i, _ := slices.BinarySearch(*a, x)
 	return a, bucket, i
 }
 
@@ -128,34 +131,44 @@ func (s *SortedSet[T]) Contains(x T) bool {
 		return false
 	}
 	a, _, i := s.position(x)
-	return i < len(a) && a[i] == x
+	return i < len(*a) && (*a)[i] == x
 }
 
 func (s *SortedSet[T]) Add(x T) bool {
 	if s.size == 0 {
-		s.a = [][]T{{x}}
+		s.buckets = [][]T{{x}}
 		s.size = 1
 		return true
 	}
 	a, b, i := s.position(x)
-	if i < len(a) && a[i] == x {
+	if i != len(*a) && (*a)[i] == x {
 		return false
 	}
-	a = slices.Insert(a, i, x)
+	*a = slices.Insert(*a, i, x)
+	s.buckets[b] = *a
 	s.size++
-	if len(a) > len(s.a)*splitRatio {
-		mid := len(a) >> 1
-		s.a = slices.Insert(s.a, b+1, a[:mid])
-		s.a[b] = a[mid:]
+
+	if len(*a) > len(s.buckets)*splitRatio {
+		mid := len(*a) >> 1
+		s.buckets = slices.Insert(s.buckets, b+1, (*a)[mid:])
+		s.buckets[b] = (*a)[:mid]
 	}
 	return true
 }
 
-func (s *SortedSet[T]) pop(a []T, b int, i int) T {
-	ans := slices.Delete(a, i, i+1)[0]
+func (s *SortedSet[T]) pop(a *[]T, b int, i int) T {
+	ans := (*a)[i]
+	*a = slices.Delete(*a, i, i+1)[:len(*a)-1]
 	s.size--
-	if len(a) == 0 {
-		_ = slices.Delete(s.a, b, b+1)
+	fmt.Println("b", b)
+	if len(*a) == 0 {
+		if b < 0 {
+			b = b + len(s.buckets)
+		}
+		s.buckets = slices.Delete(s.buckets, b, b+1)
+		if len(s.buckets) > 1 {
+			s.buckets = s.buckets[:len(s.buckets)-1]
+		}
 	}
 	return ans
 }
@@ -165,16 +178,17 @@ func (s *SortedSet[T]) Discard(x T) bool {
 		return false
 	}
 	a, b, i := s.position(x)
-	if i == len(a) || a[i] != x {
+	if i == len(*a) || (*a)[i] != x {
 		return false
 	}
 	_ = s.pop(a, b, i)
+
 	return true
 }
 
 func (s *SortedSet[T]) Lt(x T) (T, bool) {
-	for i := range s.a {
-		a := s.a[len(s.a)-i-1]
+	for i := range s.buckets {
+		a := s.buckets[len(s.buckets)-i-1]
 		if a[0] < x {
 			j, _ := slices.BinarySearch(a, x)
 			return a[j-1], true
@@ -185,8 +199,8 @@ func (s *SortedSet[T]) Lt(x T) (T, bool) {
 }
 
 func (s *SortedSet[T]) Le(x T) (T, bool) {
-	for i := range s.a {
-		a := s.a[len(s.a)-i-1]
+	for i := range s.buckets {
+		a := s.buckets[len(s.buckets)-i-1]
 		if a[0] <= x {
 			j, ok := slices.BinarySearch(a, x)
 			if !ok {
@@ -200,19 +214,8 @@ func (s *SortedSet[T]) Le(x T) (T, bool) {
 }
 
 func (s *SortedSet[T]) Gt(x T) (T, bool) {
-	for _, a := range s.a {
+	for _, a := range s.buckets {
 		if a[len(a)-1] > x {
-			j, _ := slices.BinarySearch(a, x)
-			return a[j+1], true
-		}
-	}
-	var v T
-	return v, false
-}
-
-func (s *SortedSet[T]) Ge(x T) (T, bool) {
-	for _, a := range s.a {
-		if a[len(a)-1] >= x {
 			j, ok := slices.BinarySearch(a, x)
 			if !ok {
 				return a[j], true
@@ -224,17 +227,31 @@ func (s *SortedSet[T]) Ge(x T) (T, bool) {
 	return v, false
 }
 
+func (s *SortedSet[T]) Ge(x T) (T, bool) {
+	for _, a := range s.buckets {
+		if a[len(a)-1] >= x {
+			j, ok := slices.BinarySearch(a, x)
+			if !ok {
+				return a[j], true
+			}
+			return a[j], true
+		}
+	}
+	var v T
+	return v, false
+}
+
 func (s *SortedSet[T]) Get(idx int) (T, error) {
 	if idx < 0 {
-		for i := range s.a {
-			a := s.a[len(s.a)-i-1]
+		for i := range s.buckets {
+			a := s.buckets[len(s.buckets)-i-1]
 			idx += len(a)
 			if idx >= 0 {
 				return a[idx], nil
 			}
 		}
 	} else {
-		for _, a := range s.a {
+		for _, a := range s.buckets {
 			if idx < len(a) {
 				return a[idx], nil
 			}
@@ -248,20 +265,21 @@ func (s *SortedSet[T]) Get(idx int) (T, error) {
 
 func (s *SortedSet[T]) Pop(idx int) (T, error) {
 	if idx < 0 {
-		for i := range s.a {
-			b := len(s.a) - i - 1
-			a := s.a[b]
-			idx += len(a)
+		for b := range s.buckets {
+			a := &s.buckets[len(s.buckets)-b-1]
+			idx += len(*a)
 			if idx >= 0 {
-				return s.pop(a, -(b + 1), idx), nil
+				v := s.pop(a, -(b + 1), idx)
+				return v, nil
 			}
 		}
 	} else {
-		for b, a := range s.a {
-			if idx < len(a) {
+		for b := range s.buckets {
+			a := &s.buckets[b]
+			if idx < len(*a) {
 				return s.pop(a, b, idx), nil
 			}
-			idx -= len(a)
+			idx -= len(*a)
 		}
 	}
 	var v T
@@ -270,7 +288,7 @@ func (s *SortedSet[T]) Pop(idx int) (T, error) {
 
 func (s *SortedSet[T]) CountLt(x T) int {
 	ans := 0
-	for _, a := range s.a {
+	for _, a := range s.buckets {
 		if a[len(a)-1] >= x {
 			i, _ := slices.BinarySearch(a, x)
 			return ans + i
@@ -282,7 +300,7 @@ func (s *SortedSet[T]) CountLt(x T) int {
 
 func (s *SortedSet[T]) CountLe(x T) int {
 	ans := 0
-	for _, a := range s.a {
+	for _, a := range s.buckets {
 		if a[len(a)-1] >= x {
 			i, ok := slices.BinarySearch(a, x)
 			if !ok {
