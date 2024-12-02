@@ -165,3 +165,28 @@ func TestSortedSet(t *testing.T) {
 	}
 
 }
+
+func TestAdd(t *testing.T) {
+	t.Parallel()
+	t.Run("add to empty", func(t *testing.T) {
+		t.Parallel()
+
+		ss := gosortedset.New([]float64{})
+		ss.Add(1)
+		slices.Equal(slices.Collect(ss.Values()), []float64{1})
+	})
+
+	t.Run("add and split", func(t *testing.T) {
+		t.Parallel()
+
+		ss := gosortedset.New([]float64{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16})
+		for i := 17; i <= 25; i++ {
+			ss.Add(float64(i))
+		}
+
+		expected := []float64{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25}
+		if !slices.Equal(slices.Collect(ss.Values()), expected) {
+			t.Errorf("want %v, got %v", expected, slices.Collect(ss.Values()))
+		}
+	})
+}
