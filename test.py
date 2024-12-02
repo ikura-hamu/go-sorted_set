@@ -1,71 +1,87 @@
 from SortedSet import SortedSet
-
-out_file = None
-
-
-def print_all(com: str, ss: SortedSet):
-    print("all", com, *ss, file=out_file)
+from dataclasses import dataclass
+from typing import Any, Iterable, Optional
+import json
 
 
-def common_print(com: str, arg):
-    if isinstance(arg, bool) and arg:
-        print(com, "true", file=out_file)
-        return
-    if isinstance(arg, bool) and not arg:
-        print(com, "false", file=out_file)
-        return
-    if arg is None:
-        print(com, "None", file=out_file)
-        return
-    print(com, arg, file=out_file)
+@dataclass
+class Output:
+    method: str
+    contents: list
+    arg: Optional[Any] = None
+    result: Optional[Any] = None
 
 
-def use(ss: SortedSet, command: str, n: int = 0):
-    if command == "add":
-        ss.add(n)
-        print_all(command, ss)
-    if command == "discard":
-        ss.discard(n)
-        print_all(command, ss)
-    if command == "get":
+@dataclass
+class Operation:
+    method: str
+    arg: Optional[Any] = None
+
+    def run(self, ss: SortedSet | None = None) -> Output:
+        if self.method == "init":
+            if self.arg is None:
+                ss = SortedSet()
+            else:
+                if isinstance(self.arg, Iterable):
+                    ss = SortedSet(self.arg)
+                else:
+                    raise ValueError("arg is not iterable")
+            return Output(self.method, [s for s in ss], self.arg, ss)
+
+        if ss is None:
+            raise ValueError
+
         try:
-            common_print(command, ss[n])
+            result = getattr(ss, self.method)(self.arg)
         except IndexError:
-            common_print(command, None)
-    if command == "pop":
-        try:
-            common_print(command, ss.pop(n))
-        except IndexError:
-            common_print(command, None)
-        print_all(command, ss)
-    if command == "index":
-        common_print(command, ss.index(n))
-    if command == "index_right":
-        common_print(command, ss.index_right(n))
-    if command == "lt":
-        common_print(command, ss.lt(n))
-    if command == "le":
-        common_print(command, ss.le(n))
-    if command == "gt":
-        common_print(command, ss.gt(n))
-    if command == "ge":
-        common_print(command, ss.ge(n))
-    if command == "contains":
-        common_print(command, n in ss)
-    if command == "len":
-        common_print(command, len(ss))
+            return Output(self.method, [s for s in ss], self.arg, "index error")
+        return Output(self.method, [s for s in ss], self.arg, result)
 
 
-def run():
-    with open("testdata/input.txt") as f:
-        lines = f.readlines()
-    ss = SortedSet()
-    for line in lines + lines:
-        command, *args = line.split()
-        use(ss, command, *map(int, args))
+class OperationEncoder(json.JSONEncoder):
+    def default(self, o):
+        if isinstance(o, Operation):
+            return {"method": o.method, "arg": o.arg}
+        if isinstance(o, Output):
+            return {
+                "method": o.method,
+                "arg": o.arg,
+                "result": o.result,
+                "contents": o.contents,
+            }
+        if isinstance(o, SortedSet):
+            return o.a
+        return super().default(o)
+
+
+def main() -> None:
+    with open("testdata/input.json") as f:
+        row_data = json.load(f)
+        test_cases: dict[str, list[Operation]] = dict()
+        for name, row_operations in row_data.items():
+            operations = [Operation(**op) for op in row_operations]
+            test_cases[name] = operations
+
+    all_outputs: dict[str, list[Output]] = dict()
+    for name, operations in test_cases.items():
+        ss: SortedSet | None = None
+        init_count = 0
+        results: list[Output] = []
+        for op in operations:
+            if op.method == "init":
+                if init_count > 0:
+                    raise ValueError("multiple init")
+                result = op.run()
+                ss = result.result
+                init_count += 1
+            else:
+                result = op.run(ss)
+            results.append(result)
+        all_outputs[name] = results
+
+    with open("testdata/output_py.json", "w") as f:
+        json.dump(all_outputs, f, cls=OperationEncoder, indent=2)
 
 
 if __name__ == "__main__":
-    with open("testdata/output_py.txt", "w") as f:
-        out_file = f
-        run()
+    main()
