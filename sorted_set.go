@@ -117,7 +117,6 @@ func (s *SortedSet[T]) position(x T) (*[]T, int, int) {
 	var a *[]T
 	for bucket = range s.buckets {
 		a = &s.buckets[bucket]
-		fmt.Println("buckets", s.buckets)
 		if x <= (*a)[len(*a)-1] {
 			break
 		}
@@ -160,7 +159,6 @@ func (s *SortedSet[T]) pop(a *[]T, b int, i int) T {
 	ans := (*a)[i]
 	*a = slices.Delete(*a, i, i+1)[:len(*a)-1]
 	s.size--
-	fmt.Println("b", b)
 	if len(*a) == 0 {
 		if b < 0 {
 			b = b + len(s.buckets)
@@ -241,7 +239,7 @@ func (s *SortedSet[T]) Ge(x T) (T, bool) {
 	return v, false
 }
 
-func (s *SortedSet[T]) Get(idx int) (T, error) {
+func (s *SortedSet[T]) GetItem(idx int) (T, error) {
 	if idx < 0 {
 		for i := range s.buckets {
 			a := s.buckets[len(s.buckets)-i-1]

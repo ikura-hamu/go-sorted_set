@@ -2,152 +2,166 @@ package gosortedset_test
 
 import (
 	_ "embed"
+	"encoding/json"
 	"errors"
-	"fmt"
-	"os"
-	"strconv"
-	"strings"
+	"slices"
 	"testing"
 
 	gosortedset "github.com/ikura-hamu/go-sorted_set"
 )
 
-//go:embed testdata/input.txt
-var input string
+//go:embed testdata/input.json
+var inputJSONStr []byte
 
-//go:embed testdata/output_py.txt
-var outputPy string
+//go:embed testdata/output_py.json
+var outputJSONStr string
 
-var out *strings.Builder
+type testOperation struct {
+	Method string `json:"method"`
+	Arg    any    `json:"arg"`
+}
 
-func printAll(t *testing.T, com string, ss *gosortedset.SortedSet[int]) {
+type output struct {
+	Method   string    `json:"method"`
+	Arg      any       `json:"arg"`
+	Result   any       `json:"result"`
+	Contents []float64 `json:"contents"`
+}
+
+func cast[T any](t *testing.T, v any) T {
 	t.Helper()
-
-	s := "all " + com
-	for v := range ss.Values() {
-		s += fmt.Sprintf(" %d", v)
-	}
-	fmt.Fprintln(out, s)
+	r, ok := v.(T)
+	requireTrue(t, ok)
+	return r
 }
 
-func commonPrint(t *testing.T, com string, v any) {
-	t.Helper()
+func castSlice[E any, S ~[]E](t *testing.T, v any) S {
+	anyArgs, ok := v.([]any)
+	requireTrue(t, ok)
+	args := make(S, len(anyArgs))
+	for i, arg := range anyArgs {
+		args[i], ok = arg.(E)
+		requireTrue(t, ok)
+	}
 
-	fmt.Fprintln(out, com, v)
+	return args
 }
 
-func commonPrint2None(t *testing.T, com string, v1 any, v2 bool) {
-	t.Helper()
+func TestSortedSet(t *testing.T) {
+	var testCases map[string][]testOperation
+	err := json.Unmarshal(inputJSONStr, &testCases)
+	requireNoError(t, err)
 
-	if v2 {
-		fmt.Fprintln(out, com, v1)
-	} else {
-		fmt.Fprintln(out, com, "None")
+	var expectedOutput map[string][]output
+	err = json.Unmarshal([]byte(outputJSONStr), &expectedOutput)
+	requireNoError(t, err)
+
+	for name, testCase := range testCases {
+		t.Run(name, func(t *testing.T) {
+			ss := gosortedset.New([]float64{})
+			outputList := make([]output, 0, len(testCase))
+			for _, op := range testCase {
+				var res any
+				switch op.Method {
+				case "init":
+					ss = gosortedset.New(castSlice[float64, []float64](t, op.Arg))
+					res = ss.Buckets()
+				case "__contains__":
+					res = ss.Contains(cast[float64](t, op.Arg))
+				case "add":
+					res = ss.Add(cast[float64](t, op.Arg))
+				case "discard":
+					res = ss.Discard(cast[float64](t, op.Arg))
+				case "lt":
+					lt, exist := ss.Lt(cast[float64](t, op.Arg))
+					if !exist {
+						res = nil
+					} else {
+						res = lt
+					}
+				case "le":
+					le, exist := ss.Le(cast[float64](t, op.Arg))
+					if !exist {
+						res = nil
+					} else {
+						res = le
+					}
+				case "gt":
+					gt, exist := ss.Gt(cast[float64](t, op.Arg))
+					if !exist {
+						res = nil
+					} else {
+						res = gt
+					}
+				case "ge":
+					ge, exist := ss.Ge(cast[float64](t, op.Arg))
+					if !exist {
+						res = nil
+					} else {
+						res = ge
+					}
+				case "__getitem__":
+					item, err := ss.GetItem(int(cast[float64](t, op.Arg)))
+					if errors.Is(err, gosortedset.ErrIndexOutOfRange) {
+						res = "index error"
+					} else if err != nil {
+						t.Fatalf("unexpected error: %v", err)
+					} else {
+						res = item
+					}
+				case "pop":
+					item, err := ss.Pop(int(cast[float64](t, op.Arg)))
+					if errors.Is(err, gosortedset.ErrIndexOutOfRange) {
+						res = "index error"
+					} else if err != nil {
+						t.Fatalf("unexpected error: %v", err)
+					} else {
+						res = item
+					}
+				case "index":
+					res = ss.CountLe(cast[float64](t, op.Arg))
+				case "index_right":
+					res = ss.CountLt(cast[float64](t, op.Arg))
+				default:
+					t.Fatalf("unknown method %s", op.Method)
+				}
+
+				output := output{
+					Method:   op.Method,
+					Arg:      op.Arg,
+					Result:   res,
+					Contents: slices.Collect(ss.Values()),
+				}
+				outputList = append(outputList, output)
+			}
+
+			expected, ok := expectedOutput[name]
+			requireTrue(t, ok)
+
+			for i, output := range outputList {
+				expectedResult := expected[i]
+
+				switch expectedR := expectedResult.Result.(type) {
+				case bool:
+					r, ok := output.Result.(bool)
+					requireTrue(t, ok)
+					if r != expectedR {
+						t.Errorf("expected result %v, got %v", expectedR, r)
+					}
+				case []float64:
+					r, ok := output.Result.([]float64)
+					requireTrue(t, ok)
+					if !slices.Equal(r, expectedR) {
+						t.Errorf("expected result %v, got %v", expectedR, r)
+					}
+				}
+
+				if !slices.Equal(output.Contents, expectedResult.Contents) {
+					t.Errorf("expected contents %v, got %v", expectedResult.Contents, output.Contents)
+				}
+			}
+
+		})
 	}
-}
 
-func use(t *testing.T, ss *gosortedset.SortedSet[int], c string, x int) {
-
-	switch c {
-	case "add":
-		ss.Add(x)
-		printAll(t, c, ss)
-	case "discard":
-		ss.Discard(x)
-		printAll(t, c, ss)
-	case "get":
-		v, err := ss.Get(x)
-		if errors.Is(err, gosortedset.ErrIndexOutOfRange) {
-			commonPrint(t, c, "None")
-		} else if err != nil {
-			t.Fatal(err)
-		} else {
-			commonPrint(t, c, v)
-		}
-	case "pop":
-		v, err := ss.Pop(x)
-		if errors.Is(err, gosortedset.ErrIndexOutOfRange) {
-			commonPrint(t, c, "None")
-		} else if err != nil {
-			t.Fatal(err)
-		} else {
-			commonPrint(t, c, v)
-		}
-		printAll(t, c, ss)
-	case "index":
-		v := ss.CountLt(x)
-		commonPrint(t, c, v)
-	case "index_right":
-		v := ss.CountLe(x)
-		commonPrint(t, c, v)
-	case "lt":
-		v, ok := ss.Lt(x)
-		commonPrint2None(t, c, v, ok)
-	case "le":
-		v, ok := ss.Le(x)
-		commonPrint2None(t, c, v, ok)
-	case "gt":
-		v, ok := ss.Gt(x)
-		commonPrint2None(t, c, v, ok)
-	case "ge":
-		v, ok := ss.Ge(x)
-		commonPrint2None(t, c, v, ok)
-	case "contains":
-		v := ss.Contains(x)
-		commonPrint(t, c, v)
-	case "len":
-		v := ss.Len()
-		commonPrint(t, c, v)
-	}
-}
-
-func TestXxx(t *testing.T) {
-	lines := strings.Split(input, "\n")
-	ss := gosortedset.New([]int{})
-
-	out = &strings.Builder{}
-
-	lines = append(lines, lines...)
-
-	for _, line := range lines {
-		if len(line) == 0 {
-			continue
-		}
-		fields := strings.Fields(line)
-		var c string
-		xStr := "0"
-		c = fields[0]
-		if len(fields) > 1 {
-			xStr = fields[1]
-		}
-		x, err := strconv.Atoi(xStr)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		use(t, ss, c, x)
-	}
-
-	outputGo := out.String()
-	f, err := os.Create("testdata/output_go.txt")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer f.Close()
-	_, err = f.WriteString(outputGo)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	outputPyLines := strings.Split(outputPy, "\n")
-	outputGoLines := strings.Split(outputGo, "\n")
-
-	if len(outputPyLines) != len(outputGoLines) {
-		t.Errorf("len(outputPyLines) = %d, len(outputGoLines) = %d", len(outputPyLines), len(outputGoLines))
-	}
-	for i := range outputPyLines {
-		if outputPyLines[i] != outputGoLines[i] {
-			t.Errorf("outputPyLines[%d] = %s, outputGoLines[%d] = %s", i, outputPyLines[i], i, outputGoLines[i])
-		}
-	}
 }
