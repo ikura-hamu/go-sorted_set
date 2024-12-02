@@ -37,6 +37,22 @@
     { "method": "add", "arg": 18 },
     { "method": "add", "arg": 36 }
   ],
+  "add_split": [
+    {
+      "method": "init",
+      "arg": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+    },
+    { "method": "add", "arg": 17 },
+    { "method": "add", "arg": 18 },
+    { "method": "add", "arg": 19 },
+    { "method": "add", "arg": 20 },
+    { "method": "add", "arg": 21 },
+    { "method": "add", "arg": 22 },
+    { "method": "add", "arg": 23 },
+    { "method": "add", "arg": 24 },
+    { "method": "add", "arg": 25 },
+    { "method": "add", "arg": 26 }
+  ],
   "discard": [
     {
       "method": "init",
