@@ -74,6 +74,46 @@ func TestNew(t *testing.T) {
 	}
 }
 
+func TestAll(t *testing.T) {
+	t.Parallel()
+
+	testCases := map[string]struct {
+		initial  []int
+		expected []int
+	}{
+		"ok": {
+			initial:  []int{1, 2, 3, 4, 5},
+			expected: []int{1, 2, 3, 4, 5},
+		},
+		"multiple buckets": {
+			initial:  []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17},
+			expected: []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17},
+		},
+	}
+
+	for name, testCase := range testCases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			ss := gosortedset.New(testCase.initial)
+			actual := make([]int, 0, len(testCase.initial))
+			idx := make([]int, 0, len(testCase.initial))
+			expectedIdx := make([]int, 0, len(testCase.initial))
+			for i := range len(testCase.initial) {
+				expectedIdx = append(expectedIdx, i)
+			}
+			ss.All()(func(i int, v int) bool {
+				idx = append(idx, i)
+				actual = append(actual, v)
+				return true
+			})
+
+			assertEqualSlice(t, expectedIdx, idx)
+			assertEqualSlice(t, testCase.expected, actual)
+		})
+	}
+}
+
 func TestAdd(t *testing.T) {
 	t.Parallel()
 
