@@ -192,6 +192,59 @@ func TestLen(t *testing.T) {
 	}
 }
 
+func TestEquals(t *testing.T) {
+	t.Parallel()
+
+	testCases := map[string]struct {
+		rcv      *gosortedset.SortedSet[int]
+		arg      *gosortedset.SortedSet[int]
+		expected bool
+	}{
+		"ok": {
+			rcv:      gosortedset.New([]int{1, 2, 3, 4, 5}),
+			arg:      gosortedset.New([]int{1, 2, 3, 4, 5}),
+			expected: true,
+		},
+		"not equals": {
+			rcv:      gosortedset.New([]int{1, 2, 3, 4, 5}),
+			arg:      gosortedset.New([]int{1, 2, 3, 4, 6}),
+			expected: false,
+		},
+		"empty": {
+			rcv:      gosortedset.New([]int{}),
+			arg:      gosortedset.New([]int{}),
+			expected: true,
+		},
+		"different length": {
+			rcv:      gosortedset.New([]int{1, 2, 3, 4, 5}),
+			arg:      gosortedset.New([]int{1, 2, 3, 4}),
+			expected: false,
+		},
+		"multiple buckets": {
+			rcv:      gosortedset.New([]int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17}),
+			arg:      gosortedset.New([]int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17}),
+			expected: true,
+		},
+		"different buckets": {
+			rcv:      gosortedset.New([]int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17}),
+			arg:      gosortedset.New([]int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}),
+			expected: false,
+		},
+	}
+
+	for name, testCase := range testCases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			result := testCase.rcv.Equals(testCase.arg)
+			if result != testCase.expected {
+				t.Errorf("expected %v, got %v", testCase.expected, result)
+			}
+		})
+	}
+
+}
+
 func TestAdd(t *testing.T) {
 	t.Parallel()
 
