@@ -67,11 +67,12 @@ func (s *SortedSet[T]) Values() iter.Seq[T] {
 }
 
 func (s *SortedSet[T]) Backward() iter.Seq2[int, T] {
+	bucketNum := len(s.buckets)
 	return func(yield func(int, T) bool) {
 		idx := s.size - 1
-		for i := range s.size {
-			for j := range len(s.buckets[s.size-i-1]) {
-				if !yield(idx, s.buckets[s.size-i-1][len(s.buckets[s.size-i-1])-j-1]) {
+		for i := range s.buckets {
+			for j := range len(s.buckets[bucketNum-i-1]) {
+				if !yield(idx, s.buckets[bucketNum-i-1][len(s.buckets[bucketNum-i-1])-j-1]) {
 					return
 				}
 				idx--
