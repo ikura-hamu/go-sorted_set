@@ -284,7 +284,7 @@ func (s *SortedSet[T]) Pop(idx int) (T, error) {
 	return v, ErrIndexOutOfRange
 }
 
-func (s *SortedSet[T]) CountLt(x T) int {
+func (s *SortedSet[T]) Index(x T) int {
 	ans := 0
 	for _, a := range s.buckets {
 		if a[len(a)-1] >= x {
@@ -296,7 +296,7 @@ func (s *SortedSet[T]) CountLt(x T) int {
 	return ans
 }
 
-func (s *SortedSet[T]) CountLe(x T) int {
+func (s *SortedSet[T]) IndexRight(x T) int {
 	ans := 0
 	for _, a := range s.buckets {
 		if a[len(a)-1] >= x {
