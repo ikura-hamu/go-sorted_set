@@ -511,3 +511,58 @@ func TestGt(t *testing.T) {
 		})
 	}
 }
+
+func TestGe(t *testing.T) {
+	t.Parallel()
+
+	testCases := map[string]struct {
+		initial       []int
+		arg           int
+		expectedValue int
+		expectedExist bool
+	}{
+		"ok": {
+			initial:       []int{1, 2, 3, 4, 5},
+			arg:           3,
+			expectedValue: 3,
+			expectedExist: true,
+		},
+		"not contains": {
+			initial:       []int{1, 2, 4, 5},
+			arg:           3,
+			expectedValue: 4,
+			expectedExist: true,
+		},
+		"return false": {
+			initial:       []int{1, 2, 3, 4, 5},
+			arg:           6,
+			expectedValue: 0,
+			expectedExist: false,
+		},
+		"multiple buckets": {
+			initial:       []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17},
+			arg:           9,
+			expectedValue: 9,
+			expectedExist: true,
+		},
+		"empty": {
+			initial:       []int{},
+			arg:           1,
+			expectedValue: 0,
+			expectedExist: false,
+		},
+	}
+
+	for name, testCase := range testCases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			ss := gosortedset.New(testCase.initial)
+			value, ok := ss.Ge(testCase.arg)
+			if value != testCase.expectedValue || ok != testCase.expectedExist {
+				t.Errorf("expected %v, %v, got %v, %v", testCase.expectedValue, testCase.expectedExist, value, ok)
+			}
+		})
+	}
+
+}
