@@ -782,3 +782,50 @@ func TestIndex(t *testing.T) {
 		})
 	}
 }
+
+func TestIndexRight(t *testing.T) {
+	t.Parallel()
+
+	testCases := map[string]struct {
+		initial  []int
+		arg      int
+		expected int
+	}{
+		"ok": {
+			initial:  []int{1, 2, 3, 4, 5},
+			arg:      3,
+			expected: 3,
+		},
+		"not contains": {
+			initial:  []int{1, 2, 4, 5},
+			arg:      3,
+			expected: 2,
+		},
+		"empty": {
+			initial:  []int{},
+			arg:      1,
+			expected: 0,
+		},
+		"multiple buckets": {
+			initial:  []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17},
+			arg:      15,
+			expected: 15,
+		},
+		"multiple buckets not contains": {
+			initial:  []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 16, 17, 18},
+			arg:      15,
+			expected: 14,
+		},
+	}
+
+	for name, testCase := range testCases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			ss := gosortedset.New(testCase.initial)
+			if ss.IndexRight(testCase.arg) != testCase.expected {
+				t.Errorf("expected %v, got %v", testCase.expected, ss.Index(testCase.arg))
+			}
+		})
+	}
+}
