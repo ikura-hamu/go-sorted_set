@@ -164,6 +164,25 @@ func castSlice[E any, S ~[]E](t *testing.T, v any) S {
 
 // }
 
+func assertEqualSlice[E comparable, S ~[]E](t *testing.T, expected S, actual S) {
+	t.Helper()
+	if !slices.Equal(expected, actual) {
+		t.Errorf("expected %v, got %v", expected, actual)
+	}
+}
+
+func assertEqualBuckets[E comparable, B ~[][]E](t *testing.T, expected, actual B) {
+	t.Helper()
+	if len(expected) != len(actual) {
+		t.Errorf("expected %v, got %v", expected, actual)
+	}
+
+	for i, b := range actual {
+		if !slices.Equal(b, expected[i]) {
+			t.Errorf("buckets[%d]: expected %v, got %v", i, expected[i], actual[i])
+		}
+	}
+}
 func TestAdd(t *testing.T) {
 	t.Parallel()
 
@@ -215,16 +234,9 @@ func TestAdd(t *testing.T) {
 
 			ss := gosortedset.New(testCase.initial)
 			testCase.operation(ss)
-			if !slices.Equal(slices.Collect(ss.Values()), testCase.expected) {
-				t.Errorf("expected %v, got %v", testCase.expected, slices.Collect(ss.Values()))
-			}
+			assertEqualSlice(t, testCase.expected, slices.Collect(ss.Values()))
 
-			buckets := ss.Buckets()
-			for i, b := range buckets {
-				if !slices.Equal(b, testCase.expectedBuckets[i]) {
-					t.Errorf("expected %v, got %v", testCase.expectedBuckets[i], b)
-				}
-			}
+			assertEqualBuckets(t, testCase.expectedBuckets, ss.Buckets())
 		})
 	}
 }
@@ -262,6 +274,78 @@ func TestContains(t *testing.T) {
 			if ss.Contains(testCase.arg) != testCase.expected {
 				t.Errorf("expected %v, got %v", testCase.expected, ss.Contains(testCase.arg))
 			}
+		})
+	}
+}
+
+func TestDiscard(t *testing.T) {
+	t.Parallel()
+
+	testCases := map[string]struct {
+		initial       []int
+		preOperation  func(ss *gosortedset.SortedSet[int])
+		arg           int
+		expected      bool
+		result        []int
+		resultBuckets [][]int
+	}{
+		"ok": {
+			initial:       []int{1, 2, 3, 4, 5},
+			arg:           3,
+			expected:      true,
+			result:        []int{1, 2, 4, 5},
+			resultBuckets: [][]int{{1, 2, 4, 5}},
+		},
+		"not contains": {
+			initial:       []int{1, 2, 3, 4, 5},
+			arg:           6,
+			expected:      false,
+			result:        []int{1, 2, 3, 4, 5},
+			resultBuckets: [][]int{{1, 2, 3, 4, 5}},
+		},
+		"empty": {
+			initial:       []int{},
+			arg:           1,
+			expected:      false,
+			result:        []int{},
+			resultBuckets: [][]int{},
+		},
+		"set empty": {
+			initial:       []int{1},
+			arg:           1,
+			expected:      true,
+			result:        []int{},
+			resultBuckets: [][]int{},
+		},
+		"bucket empty": {
+			initial: []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17},
+			preOperation: func(ss *gosortedset.SortedSet[int]) {
+				for i := 1; i <= 7; i++ {
+					ss.Discard(i)
+				}
+			},
+			arg:           8,
+			expected:      true,
+			result:        []int{9, 10, 11, 12, 13, 14, 15, 16, 17},
+			resultBuckets: [][]int{{9, 10, 11, 12, 13, 14, 15, 16, 17}},
+		},
+	}
+
+	for name, testCase := range testCases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			ss := gosortedset.New(testCase.initial)
+			if testCase.preOperation != nil {
+				testCase.preOperation(ss)
+			}
+
+			if ss.Discard(testCase.arg) != testCase.expected {
+				t.Errorf("expected %v, got %v", testCase.expected, ss.Discard(testCase.arg))
+			}
+
+			assertEqualSlice(t, testCase.result, slices.Collect(ss.Values()))
+			assertEqualBuckets(t, testCase.resultBuckets, ss.Buckets())
 		})
 	}
 }

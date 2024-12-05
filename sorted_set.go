@@ -164,7 +164,7 @@ func (s *SortedSet[T]) pop(a *[]T, b int, i int) T {
 			b = b + len(s.buckets)
 		}
 		s.buckets = slices.Delete(s.buckets, b, b+1)
-		if len(s.buckets) > 1 {
+		if len(s.buckets) > 1 { // TODO: 上で代入してるから、ここは必要ではないが、どっちが速いか調べる必要がある
 			s.buckets = s.buckets[:len(s.buckets)-1]
 		}
 	}
