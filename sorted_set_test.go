@@ -633,3 +633,105 @@ func TestGetItem(t *testing.T) {
 		})
 	}
 }
+
+func TestPop(t *testing.T) {
+	t.Parallel()
+
+	testCases := map[string]struct {
+		initial         []int
+		preOperation    func(ss *gosortedset.SortedSet[int])
+		arg             int
+		expectedValue   int
+		expectedError   error
+		expected        []int
+		expectedBuckets [][]int
+	}{
+		"ok": {
+			initial:         []int{1, 2, 3, 4, 5},
+			arg:             2,
+			expectedValue:   3,
+			expected:        []int{1, 2, 4, 5},
+			expectedBuckets: [][]int{{1, 2, 4, 5}},
+		},
+		"index out of range": {
+			initial:       []int{1, 2, 3, 4, 5},
+			arg:           5,
+			expectedError: gosortedset.ErrIndexOutOfRange,
+		},
+		"negative index": {
+			initial:         []int{1, 2, 3, 4, 5},
+			arg:             -1,
+			expectedValue:   5,
+			expected:        []int{1, 2, 3, 4},
+			expectedBuckets: [][]int{{1, 2, 3, 4}},
+		},
+		"negative index out of range": {
+			initial:       []int{1, 2, 3, 4, 5},
+			arg:           -6,
+			expectedError: gosortedset.ErrIndexOutOfRange,
+		},
+		"multiple buckets": {
+			initial:       []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17},
+			arg:           15,
+			expectedValue: 16,
+			expected:      []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 17},
+			expectedBuckets: [][]int{
+				{1, 2, 3, 4, 5, 6, 7, 8},
+				{9, 10, 11, 12, 13, 14, 15, 17},
+			},
+		},
+		"multiple buckets negative index": {
+			initial:       []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17},
+			arg:           -2,
+			expectedValue: 16,
+			expected:      []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 17},
+			expectedBuckets: [][]int{
+				{1, 2, 3, 4, 5, 6, 7, 8},
+				{9, 10, 11, 12, 13, 14, 15, 17},
+			},
+		},
+		"empty": {
+			initial:       []int{},
+			arg:           0,
+			expectedError: gosortedset.ErrIndexOutOfRange,
+		},
+		"bucket become empty": {
+			initial: []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17},
+			preOperation: func(ss *gosortedset.SortedSet[int]) {
+				for range 7 {
+					_, _ = ss.Pop(0)
+				}
+			},
+			arg:             0,
+			expectedValue:   8,
+			expected:        []int{9, 10, 11, 12, 13, 14, 15, 16, 17},
+			expectedBuckets: [][]int{{9, 10, 11, 12, 13, 14, 15, 16, 17}},
+		},
+	}
+
+	for name, testCase := range testCases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			ss := gosortedset.New(testCase.initial)
+			if testCase.preOperation != nil {
+				testCase.preOperation(ss)
+			}
+
+			value, err := ss.Pop(testCase.arg)
+			if testCase.expectedError != nil {
+				if !errors.Is(err, testCase.expectedError) {
+					t.Errorf("expected error %v, got %v", testCase.expectedError, err)
+				}
+				return
+			}
+
+			if value != testCase.expectedValue {
+				t.Errorf("expected %v, got %v", testCase.expectedValue, value)
+			}
+
+			assertEqualSlice(t, testCase.expected, slices.Collect(ss.Values()))
+			assertEqualBuckets(t, testCase.expectedBuckets, ss.Buckets())
+		})
+	}
+}
