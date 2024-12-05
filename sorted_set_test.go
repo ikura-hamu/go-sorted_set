@@ -168,25 +168,65 @@ func TestSortedSet(t *testing.T) {
 
 func TestAdd(t *testing.T) {
 	t.Parallel()
-	t.Run("add to empty", func(t *testing.T) {
-		t.Parallel()
 
-		ss := gosortedset.New([]float64{})
-		ss.Add(1)
-		slices.Equal(slices.Collect(ss.Values()), []float64{1})
-	})
+	testCases := map[string]struct {
+		initial         []int
+		operation       func(ss *gosortedset.SortedSet[int])
+		expected        []int
+		expectedBuckets [][]int
+	}{
+		"ok": {
+			initial: []int{1, 2, 4, 5},
+			operation: func(ss *gosortedset.SortedSet[int]) {
+				ss.Add(3)
+			},
+			expected:        []int{1, 2, 3, 4, 5},
+			expectedBuckets: [][]int{{1, 2, 3, 4, 5}},
+		},
+		"add to empty": {
+			initial: []int{},
+			operation: func(ss *gosortedset.SortedSet[int]) {
+				ss.Add(1)
+			},
+			expected:        []int{1},
+			expectedBuckets: [][]int{{1}},
+		},
+		"add and split": {
+			initial: []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16},
+			operation: func(ss *gosortedset.SortedSet[int]) {
+				for i := 17; i <= 25; i++ {
+					ss.Add(i)
+				}
+			},
+			expected:        []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25},
+			expectedBuckets: [][]int{{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12}, {13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25}},
+		},
+		"contains same item": {
+			initial: []int{1, 2, 3, 4, 5},
+			operation: func(ss *gosortedset.SortedSet[int]) {
+				ss.Add(3)
+			},
+			expected:        []int{1, 2, 3, 4, 5},
+			expectedBuckets: [][]int{{1, 2, 3, 4, 5}},
+		},
+	}
 
-	t.Run("add and split", func(t *testing.T) {
-		t.Parallel()
+	for name, testCase := range testCases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 
-		ss := gosortedset.New([]float64{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16})
-		for i := 17; i <= 25; i++ {
-			ss.Add(float64(i))
-		}
+			ss := gosortedset.New(testCase.initial)
+			testCase.operation(ss)
+			if !slices.Equal(slices.Collect(ss.Values()), testCase.expected) {
+				t.Errorf("expected %v, got %v", testCase.expected, slices.Collect(ss.Values()))
+			}
 
-		expected := []float64{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25}
-		if !slices.Equal(slices.Collect(ss.Values()), expected) {
-			t.Errorf("want %v, got %v", expected, slices.Collect(ss.Values()))
-		}
-	})
+			buckets := ss.Buckets()
+			for i, b := range buckets {
+				if !slices.Equal(b, testCase.expectedBuckets[i]) {
+					t.Errorf("expected %v, got %v", testCase.expectedBuckets[i], b)
+				}
+			}
+		})
+	}
 }
