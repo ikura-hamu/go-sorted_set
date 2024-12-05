@@ -5,10 +5,5 @@ version: "3"
 tasks:
   test:
     cmds:
-      - python test.py
       - go test ./...
     silent: true
-
-  clean:
-    cmds:
-      - rm testdata/output_*.txt

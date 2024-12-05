@@ -67,11 +67,12 @@ func (s *SortedSet[T]) Values() iter.Seq[T] {
 }
 
 func (s *SortedSet[T]) Backward() iter.Seq2[int, T] {
+	bucketNum := len(s.buckets)
 	return func(yield func(int, T) bool) {
 		idx := s.size - 1
-		for i := range s.size {
-			for j := range len(s.buckets[s.size-i-1]) {
-				if !yield(idx, s.buckets[s.size-i-1][len(s.buckets[s.size-i-1])-j-1]) {
+		for i := range s.buckets {
+			for j := range len(s.buckets[bucketNum-i-1]) {
+				if !yield(idx, s.buckets[bucketNum-i-1][len(s.buckets[bucketNum-i-1])-j-1]) {
 					return
 				}
 				idx--
@@ -164,7 +165,7 @@ func (s *SortedSet[T]) pop(a *[]T, b int, i int) T {
 			b = b + len(s.buckets)
 		}
 		s.buckets = slices.Delete(s.buckets, b, b+1)
-		if len(s.buckets) > 1 {
+		if len(s.buckets) > 1 { // TODO: 上で代入してるから、ここは必要ではないが、どっちが速いか調べる必要がある
 			s.buckets = s.buckets[:len(s.buckets)-1]
 		}
 	}
@@ -284,7 +285,7 @@ func (s *SortedSet[T]) Pop(idx int) (T, error) {
 	return v, ErrIndexOutOfRange
 }
 
-func (s *SortedSet[T]) CountLt(x T) int {
+func (s *SortedSet[T]) Index(x T) int {
 	ans := 0
 	for _, a := range s.buckets {
 		if a[len(a)-1] >= x {
@@ -296,7 +297,7 @@ func (s *SortedSet[T]) CountLt(x T) int {
 	return ans
 }
 
-func (s *SortedSet[T]) CountLe(x T) int {
+func (s *SortedSet[T]) IndexRight(x T) int {
 	ans := 0
 	for _, a := range s.buckets {
 		if a[len(a)-1] >= x {
