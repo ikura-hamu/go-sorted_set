@@ -159,6 +159,39 @@ func TestBackward(t *testing.T) {
 	}
 }
 
+func TestLen(t *testing.T) {
+	t.Parallel()
+
+	testCases := map[string]struct {
+		initial  []int
+		expected int
+	}{
+		"ok": {
+			initial:  []int{1, 2, 3, 4, 5},
+			expected: 5,
+		},
+		"empty": {
+			initial:  []int{},
+			expected: 0,
+		},
+		"multiple buckets": {
+			initial:  []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17},
+			expected: 17,
+		},
+	}
+
+	for name, testCase := range testCases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			ss := gosortedset.New(testCase.initial)
+			if ss.Len() != testCase.expected {
+				t.Errorf("expected %v, got %v", testCase.expected, ss.Len())
+			}
+		})
+	}
+}
+
 func TestAdd(t *testing.T) {
 	t.Parallel()
 
