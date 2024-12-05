@@ -2,6 +2,7 @@ package gosortedset_test
 
 import (
 	_ "embed"
+	"errors"
 	"slices"
 	"testing"
 
@@ -565,4 +566,70 @@ func TestGe(t *testing.T) {
 		})
 	}
 
+}
+
+func TestGetItem(t *testing.T) {
+	t.Parallel()
+
+	testCases := map[string]struct {
+		initial       []int
+		arg           int
+		expectedValue int
+		expectedError error
+	}{
+		"ok": {
+			initial:       []int{1, 2, 3, 4, 5},
+			arg:           2,
+			expectedValue: 3,
+		},
+		"index out of range": {
+			initial:       []int{1, 2, 3, 4, 5},
+			arg:           5,
+			expectedError: gosortedset.ErrIndexOutOfRange,
+		},
+		"negative index": {
+			initial:       []int{1, 2, 3, 4, 5},
+			arg:           -1,
+			expectedValue: 5,
+		},
+		"negative index out of range": {
+			initial:       []int{1, 2, 3, 4, 5},
+			arg:           -6,
+			expectedError: gosortedset.ErrIndexOutOfRange,
+		},
+		"multiple buckets": {
+			initial:       []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17},
+			arg:           15,
+			expectedValue: 16,
+		},
+		"multiple buckets negative index": {
+			initial:       []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17},
+			arg:           -2,
+			expectedValue: 16,
+		},
+		"empty": {
+			initial:       []int{},
+			arg:           0,
+			expectedError: gosortedset.ErrIndexOutOfRange,
+		},
+	}
+
+	for name, testCase := range testCases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			ss := gosortedset.New(testCase.initial)
+			value, err := ss.GetItem(testCase.arg)
+			if testCase.expectedError != nil {
+				if !errors.Is(err, testCase.expectedError) {
+					t.Errorf("expected error %v, got %v", testCase.expectedError, err)
+				}
+				return
+			}
+
+			if value != testCase.expectedValue {
+				t.Errorf("expected %v, got %v", testCase.expectedValue, value)
+			}
+		})
+	}
 }
