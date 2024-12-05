@@ -27,6 +27,53 @@ func assertEqualBuckets[E comparable, B ~[][]E](t *testing.T, expected, actual B
 		}
 	}
 }
+
+func TestNew(t *testing.T) {
+	t.Parallel()
+
+	testCases := map[string]struct {
+		initial         []int
+		expected        []int
+		expectedBuckets [][]int
+	}{
+		"ok": {
+			initial:         []int{1, 2, 3, 4, 5},
+			expected:        []int{1, 2, 3, 4, 5},
+			expectedBuckets: [][]int{{1, 2, 3, 4, 5}},
+		},
+		"empty": {
+			initial:         []int{},
+			expected:        []int{},
+			expectedBuckets: [][]int{},
+		},
+		"not sorted": {
+			initial:         []int{5, 4, 3, 2, 1},
+			expected:        []int{1, 2, 3, 4, 5},
+			expectedBuckets: [][]int{{1, 2, 3, 4, 5}},
+		},
+		"multiple buckets": {
+			initial:         []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17},
+			expected:        []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17},
+			expectedBuckets: [][]int{{1, 2, 3, 4, 5, 6, 7, 8}, {9, 10, 11, 12, 13, 14, 15, 16, 17}},
+		},
+		"duplicate": {
+			initial:         []int{1, 2, 3, 4, 5, 5, 5, 5, 5},
+			expected:        []int{1, 2, 3, 4, 5},
+			expectedBuckets: [][]int{{1, 2, 3, 4, 5}},
+		},
+	}
+
+	for name, testCase := range testCases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			ss := gosortedset.New(testCase.initial)
+			assertEqualSlice(t, testCase.expected, slices.Collect(ss.Values()))
+			assertEqualBuckets(t, testCase.expectedBuckets, ss.Buckets())
+		})
+	}
+}
+
 func TestAdd(t *testing.T) {
 	t.Parallel()
 
